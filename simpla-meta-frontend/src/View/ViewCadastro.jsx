@@ -13,8 +13,12 @@ const ViewCadastro = () => {
 
     useEffect(() => {
         const cadastrarAdmin = async () => {
-            let resp = await loginService("admin", "123456")
-            setToken(resp.access_token)
+            try {
+                let resp = await loginService("admin", "123456")
+                setToken(resp?.access_token)
+            } catch {
+                setToken(null)
+            }
         }
 
         cadastrarAdmin()
@@ -29,7 +33,14 @@ const ViewCadastro = () => {
 
     const buttonCadastrar = async () => {
         console.log(token)
-        await saveUser(dados, token)
+        if (token) {
+            try {
+                await saveUser(dados, token)
+            } catch {
+                // Permite navegar no frontend mesmo com o backend desligado.
+            }
+        }
+
         navigate("/login")
     }
 

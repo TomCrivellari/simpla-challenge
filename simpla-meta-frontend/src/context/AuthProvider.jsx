@@ -19,25 +19,29 @@ export const AuthProvider = ( {children} )=>{
     },[user]);
 
     const login = async (nomeUser, senha) => {
-        let resp = await loginService(nomeUser, senha)
+        try {
+            let resp = await loginService(nomeUser, senha)
 
-        if (resp == null) {
+            if (resp == null) {
+                setUser(null)
+                return false
+            }
+            else {
+
+                let userBuscado = await buscaUserAPI(nomeUser, resp.access_token)
+                console.log(userBuscado)
+                let u = {
+                    id: userBuscado[0].id,
+                    nome: userBuscado[0].username,
+                    token: resp.access_token
+                }
+                setUser(u)
+                return true
+            }
+        } catch {
             setUser(null)
             return false
         }
-        else {
-
-            let userBuscado = await buscaUserAPI(nomeUser, resp.access_token)
-            console.log(userBuscado)
-            let u = {
-                id: userBuscado[0].id,
-                nome: userBuscado[0].username,
-                token: resp.access_token
-            }
-            setUser(u)
-            return true
-        }   
-    
     }
 
     const logout = () => {

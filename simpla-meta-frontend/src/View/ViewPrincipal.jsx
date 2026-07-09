@@ -8,13 +8,11 @@ import GraficoDespesas from "../Components/GraficoDespesas";
 import GraficoPizzaReceitas from "../Components/GraficoPizzaReceitas";
 import GraficoPizzaDespesas from "../Components/GraficoPizzaDespesas";
 import { useAuth } from "../context/AuthProvider";
-import { useNavigate } from "react-router-dom";
 import { buscaUserAPI, getDespesas, getReceitas, saveDespesa, saveReceita } from "../service/Services";
 
 const ViewPrincipal = () => {
 
-    const {user, logout} = useAuth()
-    const navigate = useNavigate()
+    const {user} = useAuth()
 
     const [saldo, setSaldo] = useState(0);
     const [receitas, setReceitas] = useState([]);
@@ -24,16 +22,17 @@ const ViewPrincipal = () => {
     useEffect(() => {
         const carregarDados = async () => {
             if (user == null) {
-                navigate("/login");
-            } else {
+                return;
+            }
+
+            try {
                 let receitasBuscadas = await getReceitas(user.id, user.token);
                 let despesasBuscadas = await getDespesas(user.id, user.token);
                 let userBuscado = await buscaUserAPI(user.nome, user.token)
                 
 
                 if (receitasBuscadas == null || despesasBuscadas == null || userBuscado == null) {
-                    logout()
-                    navigate("/login");
+                    return;
                 }
 
                 let saldo = userBuscado[0].saldo
@@ -48,6 +47,8 @@ const ViewPrincipal = () => {
                 setSaldo(saldo);
                 setReceitas(receitasBuscadas);
                 setDespesas(despesasBuscadas);
+            } catch {
+                return;
             }
         };
 
@@ -55,22 +56,35 @@ const ViewPrincipal = () => {
     }, []);
 
     const carregarDados = async () => {
-        let receitasBuscadas = await getReceitas(user.id, user.token);
-        let despesasBuscadas = await getDespesas(user.id, user.token);
-        let userBuscado = await buscaUserAPI(user.nome, user.token)
-        let saldo = userBuscado[0].saldo
+        if (user == null) {
+            return;
+        }
 
-        receitasBuscadas.forEach(item => {
-            saldo += item.valor
-        });
+        try {
+            let receitasBuscadas = await getReceitas(user.id, user.token);
+            let despesasBuscadas = await getDespesas(user.id, user.token);
+            let userBuscado = await buscaUserAPI(user.nome, user.token)
 
-        despesasBuscadas.forEach(item => {
-            saldo -= item.valor
-        });
+            if (receitasBuscadas == null || despesasBuscadas == null || userBuscado == null) {
+                return;
+            }
 
-        setSaldo(saldo);
-        setReceitas(receitasBuscadas);
-        setDespesas(despesasBuscadas);
+            let saldo = userBuscado[0].saldo
+
+            receitasBuscadas.forEach(item => {
+                saldo += item.valor
+            });
+
+            despesasBuscadas.forEach(item => {
+                saldo -= item.valor
+            });
+
+            setSaldo(saldo);
+            setReceitas(receitasBuscadas);
+            setDespesas(despesasBuscadas);
+        } catch {
+            return;
+        }
     };
 
     const [mostrarFormularioReceita, setMostrarFormularioReceita] = useState(false);
@@ -78,7 +92,7 @@ const ViewPrincipal = () => {
         "descricao": "",
         "valor": "",
         "tipo": "",
-        "idUser": user.id
+        "idUser": user?.id || null
     })
 
     const [mostrarFormularioDespesa, setMostrarFormularioDespesa] = useState(false);
@@ -86,15 +100,28 @@ const ViewPrincipal = () => {
         "descricao": "",
         "valor": "",
         "tipo": "",
-        "idUser": user.id
+        "idUser": user?.id || null
     })
 
 
     const adicionarReceita = async () => {
         const valorNumerico = parseFloat(receita.valor);
         if (receita.descricao && !isNaN(valorNumerico) && valorNumerico > 0) {
-            await saveReceita(receita, user.token)
-            await carregarDados()
+            const novaReceita = {...receita, "id": Date.now(), "valor": valorNumerico, "idUser": user?.id || null}
+
+            if (user != null) {
+                try {
+                    await saveReceita(novaReceita, user.token)
+                    await carregarDados()
+                } catch {
+                    setReceitas([...receitas, novaReceita])
+                    setSaldo(saldo + valorNumerico)
+                }
+            } else {
+                setReceitas([...receitas, novaReceita])
+                setSaldo(saldo + valorNumerico)
+            }
+
             fecharFormularioReceita();
         } else {
             alert("Por favor, preencha o nome e um valor válido para a receita.");
@@ -109,8 +136,21 @@ const ViewPrincipal = () => {
     const adicionarDespesa = async () => {
         const valorNumerico = parseFloat(despesa.valor);
         if (despesa.descricao && !isNaN(valorNumerico) && valorNumerico > 0) {
-            await saveDespesa(despesa, user.token)
-            await carregarDados()
+            const novaDespesa = {...despesa, "id": Date.now(), "valor": valorNumerico, "idUser": user?.id || null}
+
+            if (user != null) {
+                try {
+                    await saveDespesa(novaDespesa, user.token)
+                    await carregarDados()
+                } catch {
+                    setDespesas([...despesas, novaDespesa])
+                    setSaldo(saldo - valorNumerico)
+                }
+            } else {
+                setDespesas([...despesas, novaDespesa])
+                setSaldo(saldo - valorNumerico)
+            }
+
             fecharFormularioDespesa();
         } else {
             alert("Por favor, preencha o nome e um valor válido para a receita.");

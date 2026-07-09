@@ -9,23 +9,25 @@ import { buscaUserAPI } from "../service/Services";
 const ViewUsuario = () => {
 
     const {user} = useAuth()
-    const [usuario, setUsuario] = useState({})
     const [novaSenha, setNovaSenha] = useState("")
     const [novoUsuario, setNovoUsuario] = useState("")
     const [mensagem, setMensagem] = useState("")
 
     useEffect(() =>{
         const buscarUser = async () => {
-            let userBuscado = await buscaUserAPI(user.nome, user.token)
-            setUsuario({
-                nomeUsuario: userBuscado[0].username || "",
-                senha: userBuscado[0].password || ""
-            })
+            if (user == null) {
+                return
+            }
+
+            try {
+                let userBuscado = await buscaUserAPI(user.nome, user.token)
+                setNovoUsuario(userBuscado[0].username || "")
+            } catch {
+                return
+            }
             
         }
         buscarUser()
-        setNovoUsuario(usuario.nomeUsuario)
-        console.log(usuario)
     }, [])
 
     const alterarUsuario = () => {

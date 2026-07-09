@@ -3,13 +3,11 @@ import CabecalhoPrincipal from "../Components/CabecalhoPrincipal"
 import { useAuth } from "../context/AuthProvider";
 import { deleteSimulacoes, getSimulacoes, saveSimulacao } from "../service/Services";
 import Button from "react-bootstrap/esm/Button";
-import { useNavigate } from "react-router-dom";
 
 
 const ViewSimulacao = () => {
 
-    const {user, logout} = useAuth()
-    const navigate = useNavigate()
+    const {user} = useAuth()
     const [simulacoes, setSimulacoes] = useState([])
     const [simulacao, setSimulacao] = useState({
         "descricao": "",
@@ -17,51 +15,92 @@ const ViewSimulacao = () => {
         "tipo": "",
         "valorEntrada": "",
         "quantidadePrestacoes": "",
-        "idUser": user.id,
+        "idUser": user?.id || null,
     })
 
     const deletar = async (id) => {
-        await deleteSimulacoes(id, user.token)
-        carregarDados()
+        if (user == null) {
+            setSimulacoes(simulacoes.filter(item => item.id !== id))
+            return
+        }
+
+        try {
+            await deleteSimulacoes(id, user.token)
+            carregarDados()
+        } catch {
+            setSimulacoes(simulacoes.filter(item => item.id !== id))
+        }
     }
 
     useEffect(() => {
         const carregarDados = async () => {
-                let simulacoesBuscadas = await getSimulacoes(user.id, user.token);
-
-                if (simulacoesBuscadas == null) {
-                    logout()
-                    navigate("/login")
+                if (user == null) {
+                    return
                 }
 
-                setSimulacoes(simulacoesBuscadas)
+                try {
+                    let simulacoesBuscadas = await getSimulacoes(user.id, user.token);
+
+                    if (simulacoesBuscadas == null) {
+                        return
+                    }
+
+                    setSimulacoes(simulacoesBuscadas)
+                } catch {
+                    return
+                }
             }
 
         carregarDados();
     }, []);
 
     const carregarDados = async () => {
-        let simulacoesBuscadas = await getSimulacoes(user.id, user.token);
-
-        if (simulacoesBuscadas == null) {
-            logout()
-            navigate("/login")
+        if (user == null) {
+            return
         }
 
-        setSimulacoes(simulacoesBuscadas)
+        try {
+            let simulacoesBuscadas = await getSimulacoes(user.id, user.token);
+
+            if (simulacoesBuscadas == null) {
+                return
+            }
+
+            setSimulacoes(simulacoesBuscadas)
+        } catch {
+            return
+        }
     }
 
     const salvarSimulacao = async () => {
-        await saveSimulacao(simulacao, user.token)
+        const novaSimulacao = {
+            ...simulacao,
+            "id": Date.now(),
+            "valorTotal": Number(simulacao.valorTotal),
+            "valorEntrada": Number(simulacao.valorEntrada),
+            "quantidadePrestacoes": Number(simulacao.quantidadePrestacoes),
+            "idUser": user?.id || null,
+        }
+
+        if (user != null) {
+            try {
+                await saveSimulacao(novaSimulacao, user.token)
+                await carregarDados()
+            } catch {
+                setSimulacoes([...simulacoes, novaSimulacao])
+            }
+        } else {
+            setSimulacoes([...simulacoes, novaSimulacao])
+        }
+
         setSimulacao({
             "descricao": "",
             "valorTotal": "",
             "tipo": "",
             "valorEntrada": "",
             "quantidadePrestacoes": "",
-            "idUser": user.id,
+            "idUser": user?.id || null,
         })
-        await carregarDados()
     }
     return (
         <>

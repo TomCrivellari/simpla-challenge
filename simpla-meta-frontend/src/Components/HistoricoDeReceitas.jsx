@@ -8,8 +8,16 @@ const HistoricoDeReceitas = ({receitas}) => {
     const {user} = useAuth()
 
     const deletar = async (id) => {
-        await deleteReceita(id, user.token)
-        window.location.reload();
+        if (user == null) {
+            return
+        }
+
+        try {
+            await deleteReceita(id, user.token)
+            window.location.reload();
+        } catch {
+            return
+        }
     }
 
     return (

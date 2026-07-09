@@ -8,8 +8,16 @@ const HistoricoDeDespesas = ({despesas}) => {
     const {user} = useAuth()
     
     const deletar = async (id) => {
-        await deleteDespesa(id, user.token)
-        window.location.reload();
+        if (user == null) {
+            return
+        }
+
+        try {
+            await deleteDespesa(id, user.token)
+            window.location.reload();
+        } catch {
+            return
+        }
     }
 
     return (
