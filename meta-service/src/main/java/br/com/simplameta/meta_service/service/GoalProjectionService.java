@@ -2,14 +2,17 @@ package br.com.simplameta.meta_service.service;
 
 import br.com.simplameta.meta_service.dto.response.FinancialGoalResponse;
 import br.com.simplameta.meta_service.model.FinancialGoal;
+import br.com.simplameta.meta_service.model.GoalContribution;
 import br.com.simplameta.meta_service.repository.GoalContributionRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.time.LocalDate;
+import java.time.YearMonth;
+import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -23,42 +26,87 @@ public class GoalProjectionService {
     private final GoalContributionRepository contributionRepository;
 
     public FinancialGoalResponse toResponse(FinancialGoal goal, UUID userId) {
-        BigDecimal currentAmount = contributionRepository.sumAmountByGoalIdAndUserId(goal.getId(), userId);
+        List<GoalContribution> contributions = contributionRepository.findAllForProjection(goal.getId(), userId);
+        BigDecimal currentAmount = contributions.stream()
+                .map(GoalContribution::getAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal remainingAmount = goal.getTargetAmount().subtract(currentAmount).max(BigDecimal.ZERO);
-        BigDecimal monthlyRequiredSavings = calculateMonthlyRequiredSavings(remainingAmount, goal.getDeadline());
+        MonthlyProjection monthly = calculateMonthlyProjection(goal, contributions);
         BigDecimal progressPercentage = calculateProgressPercentage(currentAmount, goal.getTargetAmount());
 
         return FinancialGoalResponse.from(
                 goal,
-                currentAmount.setScale(MONEY_SCALE, RoundingMode.HALF_UP),
-                remainingAmount.setScale(MONEY_SCALE, RoundingMode.HALF_UP),
-                monthlyRequiredSavings,
+                money(currentAmount),
+                money(remainingAmount),
+                monthly.currentMonthRemaining(),
+                monthly.monthlyTarget(),
+                monthly.currentMonthContributed(),
+                monthly.currentMonthRemaining(),
+                monthly.currentMonthExtra(),
+                monthly.overdueAmount(),
                 progressPercentage
         );
     }
 
-    private BigDecimal calculateMonthlyRequiredSavings(BigDecimal remainingAmount, LocalDate deadline) {
-        if (remainingAmount.compareTo(BigDecimal.ZERO) == 0) {
-            return BigDecimal.ZERO.setScale(MONEY_SCALE, RoundingMode.HALF_UP);
+    MonthlyProjection calculateMonthlyProjection(FinancialGoal goal, List<GoalContribution> contributions) {
+        YearMonth startMonth = YearMonth.from(goal.getCreatedAt().atZone(ZoneOffset.UTC));
+        YearMonth deadlineMonth = YearMonth.from(goal.getDeadline());
+        YearMonth currentMonth = YearMonth.now();
+        long plannedMonths = Math.max(1, ChronoUnit.MONTHS.between(startMonth, deadlineMonth) + 1);
+        BigDecimal monthlyTarget = money(goal.getTargetAmount().divide(BigDecimal.valueOf(plannedMonths), MONEY_SCALE, RoundingMode.HALF_UP));
+
+        BigDecimal contributedThisMonth = sumForMonth(contributions, currentMonth);
+        BigDecimal currentMonthRemaining = monthlyTarget.subtract(contributedThisMonth).max(BigDecimal.ZERO);
+        BigDecimal currentMonthExtra = contributedThisMonth.subtract(monthlyTarget).max(BigDecimal.ZERO);
+
+        long elapsedClosedMonths = currentMonth.isAfter(startMonth)
+                ? Math.min(plannedMonths, ChronoUnit.MONTHS.between(startMonth, currentMonth))
+                : 0;
+        BigDecimal expectedBeforeCurrentMonth = monthlyTarget.multiply(BigDecimal.valueOf(elapsedClosedMonths));
+        BigDecimal contributedBeforeCurrentMonth = contributions.stream()
+                .filter(item -> YearMonth.from(item.getContributionDate()).isBefore(currentMonth))
+                .map(GoalContribution::getAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal overdueAmount = expectedBeforeCurrentMonth.subtract(contributedBeforeCurrentMonth).max(BigDecimal.ZERO);
+
+        if (currentMonth.isAfter(deadlineMonth)) {
+            currentMonthRemaining = BigDecimal.ZERO;
+            currentMonthExtra = contributedThisMonth;
         }
 
-        long monthsUntilDeadline = Math.max(1, ChronoUnit.MONTHS.between(
-                LocalDate.now().withDayOfMonth(1),
-                deadline.withDayOfMonth(1)
-        ) + 1);
+        return new MonthlyProjection(
+                money(monthlyTarget),
+                money(contributedThisMonth),
+                money(currentMonthRemaining),
+                money(currentMonthExtra),
+                money(overdueAmount)
+        );
+    }
 
-        return remainingAmount.divide(BigDecimal.valueOf(monthsUntilDeadline), MONEY_SCALE, RoundingMode.HALF_UP);
+    private BigDecimal sumForMonth(List<GoalContribution> contributions, YearMonth month) {
+        return contributions.stream()
+                .filter(item -> YearMonth.from(item.getContributionDate()).equals(month))
+                .map(GoalContribution::getAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
     private BigDecimal calculateProgressPercentage(BigDecimal currentAmount, BigDecimal targetAmount) {
-        if (targetAmount.compareTo(BigDecimal.ZERO) == 0) {
-            return BigDecimal.ZERO.setScale(PERCENTAGE_SCALE, RoundingMode.HALF_UP);
-        }
-
-        BigDecimal percentage = currentAmount
-                .multiply(ONE_HUNDRED)
-                .divide(targetAmount, PERCENTAGE_SCALE, RoundingMode.HALF_UP);
-
-        return percentage.min(ONE_HUNDRED).setScale(PERCENTAGE_SCALE, RoundingMode.HALF_UP);
+        if (targetAmount.compareTo(BigDecimal.ZERO) == 0) return BigDecimal.ZERO.setScale(PERCENTAGE_SCALE, RoundingMode.HALF_UP);
+        return currentAmount.multiply(ONE_HUNDRED)
+                .divide(targetAmount, PERCENTAGE_SCALE, RoundingMode.HALF_UP)
+                .min(ONE_HUNDRED)
+                .setScale(PERCENTAGE_SCALE, RoundingMode.HALF_UP);
     }
+
+    private BigDecimal money(BigDecimal value) {
+        return value.setScale(MONEY_SCALE, RoundingMode.HALF_UP);
+    }
+
+    record MonthlyProjection(
+            BigDecimal monthlyTarget,
+            BigDecimal currentMonthContributed,
+            BigDecimal currentMonthRemaining,
+            BigDecimal currentMonthExtra,
+            BigDecimal overdueAmount
+    ) { }
 }

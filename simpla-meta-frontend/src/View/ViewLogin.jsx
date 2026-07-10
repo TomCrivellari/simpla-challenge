@@ -1,54 +1,33 @@
-import Button from 'react-bootstrap/Button';
-import Form from 'react-bootstrap/Form';
-import CabecalhoHome from '../Components/CabecalhoHome';
-import { useState } from 'react';
-import { useAuth } from '../context/AuthProvider';
-import { useNavigate } from 'react-router';
+import { useState } from "react";
+import Button from "react-bootstrap/Button";
+import Form from "react-bootstrap/Form";
+import { Link, useNavigate } from "react-router-dom";
+import CabecalhoHome from "../Components/CabecalhoHome";
+import { useAuth } from "../context/AuthProvider";
 
 const ViewLogin = () => {
-    const [nome, setNome] = useState();
-    const [senha, setSenha] = useState();
-    const [mensagem, setMensagem] = useState("");
-    const {login} = useAuth();
+  const [form, setForm] = useState({ email: "", password: "" });
+  const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const { login } = useAuth();
+  const navigate = useNavigate();
 
-    const navigate = useNavigate();
+  const submit = async (event) => {
+    event.preventDefault(); setError(""); setSubmitting(true);
+    try { await login(form.email, form.password); navigate("/principal"); }
+    catch (err) { setError(err.message || "E-mail ou senha inválidos."); }
+    finally { setSubmitting(false); }
+  };
 
-    const logar = async () => {
-        const result = await login(nome, senha)
-        if (result) {
-            setNome("")
-            setSenha("")
-            navigate("/principal")
-        }
-        else {
-            setMensagem("Usuario ou senha invalidos!")
-        }
-    }
-    return (
-        <div>
-            <CabecalhoHome />
-            <div className='hero-shell'>
-                <Form className='surface-card w-full max-w-md p-8 flex flex-col'>
-                    <p className="text-sm font-bold uppercase tracking-[0.18em] text-[#3271FF] mb-2">Simpla Meta</p>
-                    <h1 className="text-3xl font-black mb-6">Login</h1>
-                    <Form.Group className="mb-3 w-full" controlId="formBasicEmail">
-                        <Form.Label>Usuario</Form.Label>
-                        <Form.Control type="text" value={nome} onChange={(e) => setNome(e.target.value)}/>
-                    </Form.Group>
-                    <Form.Group className="mb-3 w-full" controlId="formBasicPassword">
-                        <Form.Label>Senha</Form.Label>
-                        <Form.Control type="password" value={senha} onChange={(e) => setSenha(e.target.value)}/>
-                    </Form.Group>
-                    <Form.Text className="text-danger mb-3 min-h-6">
-                        {mensagem}
-                    </Form.Text>
-                    <Button variant="success" className="w-full py-2" onClick={logar}>
-                        Logar
-                    </Button>
-                </Form>
-            </div>
-        </div>
-    )
-}
-
-export default ViewLogin
+  return <><CabecalhoHome /><div className="hero-shell">
+    <Form onSubmit={submit} className="surface-card w-full max-w-md p-8">
+      <p className="eyebrow">Simpla Meta</p><h1 className="text-3xl font-black mb-6">Entrar</h1>
+      <Form.Group className="mb-3"><Form.Label>E-mail</Form.Label><Form.Control required type="email" autoComplete="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></Form.Group>
+      <Form.Group className="mb-3"><Form.Label>Senha</Form.Label><Form.Control required type="password" autoComplete="current-password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} /></Form.Group>
+      {error && <div className="alert alert-danger py-2">{error}</div>}
+      <Button type="submit" variant="success" className="w-full py-2" disabled={submitting}>{submitting ? "Entrando..." : "Entrar"}</Button>
+      <p className="text-center mt-4 mb-0">Ainda não tem conta? <Link to="/cadastro">Cadastre-se</Link></p>
+    </Form>
+  </div></>;
+};
+export default ViewLogin;

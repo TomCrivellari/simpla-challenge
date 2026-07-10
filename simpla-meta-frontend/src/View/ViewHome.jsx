@@ -11,7 +11,7 @@ const ViewHome = () => {
                     <div className="text-white">
                         <p className="uppercase text-sm font-bold tracking-[0.22em] text-[#41B9FF] mb-3">Simpla Meta</p>
                         <h1 className='text-5xl md:text-6xl font-black leading-tight mb-4'>Controle financeiro com foco em crescimento.</h1>
-                        <p className='text-xl text-white/75 max-w-2xl'>Organize receitas, despesas e simulações em uma interface clara para acompanhar seu saldo e planejar os próximos passos.</p>
+                        <p className='text-xl text-white/75 max-w-2xl'>Organize transações, acompanhe metas e planeje seus próximos passos com um assistente financeiro inteligente.</p>
                     </div>
                     <div className='surface-card p-8 flex flex-col gap-5'>
                         <div>

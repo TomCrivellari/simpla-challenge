@@ -1,56 +1,37 @@
-import { createContext, useContext, useEffect, useState} from "react";
-import { buscaUserAPI, loginService } from "../service/Services";
+import { createContext, useContext, useEffect, useState } from "react";
+import { authApi } from "../service/Services";
 
-const AuthContext = createContext()
+const AuthContext = createContext(null);
+const STORAGE_KEY = "simpla-meta-session";
 
+// eslint-disable-next-line react-refresh/only-export-components
+export const useAuth = () => useContext(AuthContext);
 
+export const AuthProvider = ({ children }) => {
+  const [session, setSession] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY)); } catch { return null; }
+  });
+  const [loading, setLoading] = useState(Boolean(session?.token));
 
-export const useAuth = () => {
-    return useContext(AuthContext)
-}
-export const AuthProvider = ( {children} )=>{
+  useEffect(() => {
+    if (!session?.token) { setLoading(false); return; }
+    authApi.me(session.token)
+      .then((profile) => setSession((current) => ({ ...current, user: { ...current.user, ...profile } })))
+      .catch(() => setSession(null))
+      .finally(() => setLoading(false));
+  }, [session?.token]);
 
-    const [user, setUser] = useState(() => {
-        return JSON.parse(localStorage.getItem('user')) || null;
-    });
+  useEffect(() => {
+    if (session) localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
+    else localStorage.removeItem(STORAGE_KEY);
+  }, [session]);
 
-    useEffect(()=>{
-        localStorage.setItem("user", JSON.stringify(user))
-    },[user]);
+  const login = async (email, password) => {
+    const response = await authApi.login(email, password);
+    setSession({ token: response.accessToken, expiresIn: response.expiresIn, user: response.user });
+  };
 
-    const login = async (nomeUser, senha) => {
-        try {
-            let resp = await loginService(nomeUser, senha)
+  const logout = () => setSession(null);
 
-            if (resp == null) {
-                setUser(null)
-                return false
-            }
-            else {
-
-                let userBuscado = await buscaUserAPI(nomeUser, resp.access_token)
-                console.log(userBuscado)
-                let u = {
-                    id: userBuscado[0].id,
-                    nome: userBuscado[0].username,
-                    token: resp.access_token
-                }
-                setUser(u)
-                return true
-            }
-        } catch {
-            setUser(null)
-            return false
-        }
-    }
-
-    const logout = () => {
-        setUser(null)
-    }
-
-    return (
-        <AuthContext.Provider value={{logout, login, user}}>
-            {children}
-        </AuthContext.Provider>
-    )
-}
+  return <AuthContext.Provider value={{ user: session?.user || null, token: session?.token || null, loading, login, logout }}>{children}</AuthContext.Provider>;
+};

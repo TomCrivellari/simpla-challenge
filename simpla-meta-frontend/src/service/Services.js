@@ -1,240 +1,62 @@
-const URL="http://localhost:9000"
+const API_URL = import.meta.env.VITE_API_URL || "/api/v1";
 
-export const loginService = async (login, senha)=>{
-
-    let headersList = {
-        "Accept": "*/*",
-        "User-Agent": "Thunder Client (https://www.thunderclient.com)",
-        "Content-Type": "application/json"
-        }
-
-    let bodyContent = JSON.stringify({
-        "username":`${login}`,
-        "password":`${senha}`
-    });
-
-    let response = await fetch(`${URL}/auth/login`, { 
-        method: "POST",
-        body: bodyContent,
-        headers: headersList
-    });
-
-    if (response.status == 401){
-        return null
-    }
-
-    let data = await response.text();
-    return  JSON.parse(data)
+export class ApiError extends Error {
+  constructor(message, status, fields = null) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+    this.fields = fields;
+  }
 }
 
-export const buscaUserAPI = async (login, token)=>{
+const request = async (path, { token, body, ...options } = {}) => {
+  const response = await fetch(`${API_URL}${path}`, {
+    ...options,
+    headers: {
+      Accept: "application/json",
+      ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...options.headers,
+    },
+    ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+  });
 
-    let headersList = {
-        "Accept": "*/*",
-        "User-Agent": "Thunder Client (https://www.thunderclient.com)",
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${token}`,
-        }
+  if (!response.ok) {
+    let error = {};
+    try { error = await response.json(); } catch { /* resposta sem JSON */ }
+    throw new ApiError(error.message || "Não foi possível concluir a operação.", response.status, error.fields);
+  }
 
-    let response = await fetch(`${URL}/users`, { 
-    method: "GET",
-    headers: headersList
-    });
+  if (response.status === 204) return null;
+  return response.json();
+};
 
-    if (response.status == 401){
-        return null
-    }
+export const authApi = {
+  register: (data) => request("/auth/register", { method: "POST", body: data }),
+  login: (email, password) => request("/auth/login", { method: "POST", body: { email, password } }),
+  me: (token) => request("/auth/me", { token }),
+};
 
+export const financeApi = {
+  dashboard: (token) => request("/dashboard", { token }),
+  listTransactions: (token) => request("/transactions", { token }),
+  getTransaction: (token, id) => request(`/transactions/${id}`, { token }),
+  createTransaction: (token, data) => request("/transactions", { method: "POST", token, body: data }),
+  updateTransaction: (token, id, data) => request(`/transactions/${id}`, { method: "PUT", token, body: data }),
+  deleteTransaction: (token, id) => request(`/transactions/${id}`, { method: "DELETE", token }),
+};
 
-    let usuarios = JSON.parse( await response.text() );
+export const goalsApi = {
+  list: (token) => request("/goals", { token }),
+  get: (token, id) => request(`/goals/${id}`, { token }),
+  create: (token, data) => request("/goals", { method: "POST", token, body: data }),
+  update: (token, id, data) => request(`/goals/${id}`, { method: "PUT", token, body: data }),
+  delete: (token, id) => request(`/goals/${id}`, { method: "DELETE", token }),
+  listContributions: (token, goalId) => request(`/goals/${goalId}/contributions`, { token }),
+  createContribution: (token, goalId, data) => request(`/goals/${goalId}/contributions`, { method: "POST", token, body: data }),
+  deleteContribution: (token, goalId, id) => request(`/goals/${goalId}/contributions/${id}`, { method: "DELETE", token }),
+};
 
-    return  usuarios.filter(u => u.username == login)
-
-
-}
-
-export const getReceitas = async (idUsuario, token)=>{
-    let headersList = {
-    "Accept": "*/*",
-    "User-Agent": "Thunder Client (https://www.thunderclient.com)",
-    "Authorization": `Bearer ${token}`
-    }
-
-    let response = await fetch(`${URL}/receitas`, { 
-    method: "GET",
-    headers: headersList
-    });
-
-    if (response.status == 401){
-        return null
-    }
-
-    let data = ( await response.json()) ;
-    let receitasUsuario = data.filter( a => a.idUser == idUsuario)
-
-    return receitasUsuario
-
-}
-
-export const getDespesas = async (idUsuario, token)=>{
-    let headersList = {
-    "Accept": "*/*",
-    "User-Agent": "Thunder Client (https://www.thunderclient.com)",
-    "Authorization": `Bearer ${token}`
-    }
-
-    let response = await fetch(`${URL}/despesas`, { 
-    method: "GET",
-    headers: headersList
-    });
-
-    if (response.status == 401){
-        return null
-    }
-
-    let data = ( await response.json()) ;
-    let despesasUsuario = data.filter( a => a.idUser == idUsuario)
-
-    return despesasUsuario
-
-}
-
-export const saveReceita = async (data, token)=>{
-    let headersList = {
-    "Accept": "*/*",
-    "User-Agent": "Thunder Client (https://www.thunderclient.com)",
-    "Authorization": `Bearer ${token}`,
-    "Content-Type": "application/json"
-    }
-
-    let response = await fetch(`${URL}/receitas`, { 
-        method: "POST",
-        body: JSON.stringify(data),
-        headers: headersList
-    });
-
-    return await response.text();
-
-}
-
-export const saveDespesa = async (data, token)=>{
-    let headersList = {
-    "Accept": "*/*",
-    "User-Agent": "Thunder Client (https://www.thunderclient.com)",
-    "Authorization": `Bearer ${token}`,
-    "Content-Type": "application/json"
-    }
-
-    let response = await fetch(`${URL}/despesas`, { 
-        method: "POST",
-        body: JSON.stringify(data),
-        headers: headersList
-    });
-
-    return await response.text();
-}
-
-export const saveUser = async (data, token)=>{
-    let headersList = {
-    "Accept": "*/*",
-    "User-Agent": "Thunder Client (https://www.thunderclient.com)",
-    "Authorization": `Bearer ${token}`,
-    "Content-Type": "application/json"
-    }
-
-    let response = await fetch(`${URL}/users`, { 
-        method: "POST",
-        body: JSON.stringify(data),
-        headers: headersList
-    });
-
-    return await response.text();
-}
-
-export const getSimulacoes = async (idUsuario, token)=>{
-    let headersList = {
-    "Accept": "*/*",
-    "User-Agent": "Thunder Client (https://www.thunderclient.com)",
-    "Authorization": `Bearer ${token}`
-    }
-
-    let response = await fetch(`${URL}/simulacoes`, { 
-    method: "GET",
-    headers: headersList
-    });
-
-    if (response.status == 401){
-        return null
-    }
-
-    let data = ( await response.json()) ;
-    let simulacoesUsuario = data.filter( a => a.idUser == idUsuario)
-
-    return simulacoesUsuario
-
-}
-
-export const saveSimulacao = async (data, token)=>{
-    let headersList = {
-    "Accept": "*/*",
-    "User-Agent": "Thunder Client (https://www.thunderclient.com)",
-    "Authorization": `Bearer ${token}`,
-    "Content-Type": "application/json"
-    }
-
-    let response = await fetch(`${URL}/simulacoes`, { 
-        method: "POST",
-        body: JSON.stringify(data),
-        headers: headersList
-    });
-
-    return await response.text();
-}
-
-export const deleteReceita = async (id, token)=>{
-    let headersList = {
-    "Accept": "*/*",
-    "User-Agent": "Thunder Client (https://www.thunderclient.com)",
-    "Authorization": `Bearer ${token}`,
-    "Content-Type": "application/json"
-    }
-
-    let response = await fetch(`${URL}/receitas/${id}`, { 
-        method: "DELETE",
-        headers: headersList
-    });
-
-    return await response.text();
-}
-
-export const deleteDespesa = async (id, token)=>{
-    let headersList = {
-    "Accept": "*/*",
-    "User-Agent": "Thunder Client (https://www.thunderclient.com)",
-    "Authorization": `Bearer ${token}`,
-    "Content-Type": "application/json"
-    }
-
-    let response = await fetch(`${URL}/despesas/${id}`, { 
-        method: "DELETE",
-        headers: headersList
-    });
-
-    return await response.text();
-}
-
-export const deleteSimulacoes = async (id, token)=>{
-    let headersList = {
-    "Accept": "*/*",
-    "User-Agent": "Thunder Client (https://www.thunderclient.com)",
-    "Authorization": `Bearer ${token}`,
-    "Content-Type": "application/json"
-    }
-
-    let response = await fetch(`${URL}/simulacoes/${id}`, { 
-        method: "DELETE",
-        headers: headersList
-    });
-
-    return await response.text();
-}
+export const aiApi = {
+  chat: (token, messages) => request("/ai/chat", { method: "POST", token, body: { messages } }),
+};

@@ -1,38 +1,32 @@
-import Container from 'react-bootstrap/Container';
-import Navbar from 'react-bootstrap/Navbar';
-import Nav from 'react-bootstrap/Nav';
+import Container from "react-bootstrap/Container";
+import Nav from "react-bootstrap/Nav";
+import Navbar from "react-bootstrap/Navbar";
 import { Link, useNavigate } from "react-router-dom";
-import { useAuth } from '../context/AuthProvider';
+import { useAuth } from "../context/AuthProvider";
 
 const CabecalhoPrincipal = () => {
+  const { logout, user } = useAuth();
+  const navigate = useNavigate();
+  const sair = () => { logout(); navigate("/login"); };
 
-    const {logout} = useAuth();
+  return (
+    <Navbar expand="md" className="brand-gradient py-3 shadow-sm" data-bs-theme="dark">
+      <Container>
+        <Navbar.Brand as={Link} to="/principal" className="text-white fw-bold">Simpla Meta</Navbar.Brand>
+        <Navbar.Toggle aria-controls="main-navigation" />
+        <Navbar.Collapse id="main-navigation" className="justify-content-end">
+          <Nav className="align-items-md-center gap-md-2">
+            <Nav.Link as={Link} to="/principal">Visão geral</Nav.Link>
+            <Nav.Link as={Link} to="/transacoes">Transações</Nav.Link>
+            <Nav.Link as={Link} to="/metas">Metas</Nav.Link>
+            <Nav.Link as={Link} to="/assistente">Assistente IA</Nav.Link>
+            <Navbar.Text className="px-md-3 text-white">{user?.fullName}</Navbar.Text>
+            <Nav.Link onClick={sair}>Sair</Nav.Link>
+          </Nav>
+        </Navbar.Collapse>
+      </Container>
+    </Navbar>
+  );
+};
 
-    const navigate = useNavigate();
-    const sair = () => {
-        logout();
-        navigate("/login");
-    }
-
-    return(
-        <>
-            <Navbar className="brand-gradient py-3 shadow-sm">
-                <Container>
-                    <Navbar.Brand className='text-white fw-bold'>Simpla Meta</Navbar.Brand>
-                    <Navbar.Text className='text-white opacity-90 d-none d-md-block'>
-                            Metas, saldo e decisões em um só lugar
-                    </Navbar.Text>
-                    <Navbar.Toggle />
-                    <Navbar.Collapse className="justify-content-end gap-4 text-white">
-                        <Nav.Link as={Link} to="/principal">Inicio</Nav.Link>
-                        <Nav.Link as={Link} to="/simulacao">Simular</Nav.Link>
-                        <Nav.Link as={Link} to="/usuario">Usuario</Nav.Link>
-                        <Nav.Link onClick={sair}>Sair</Nav.Link>
-                    </Navbar.Collapse>
-                </Container>
-            </Navbar>
-        </>
-    )
-}
-
-export default CabecalhoPrincipal
+export default CabecalhoPrincipal;

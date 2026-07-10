@@ -32,4 +32,16 @@ public interface GoalContributionRepository extends JpaRepository<GoalContributi
             @Param("goalId") UUID goalId,
             @Param("userId") UUID userId
     );
+
+    @Query("""
+            select c
+            from GoalContribution c
+            where c.goalId = :goalId
+            and c.userId = :userId
+            order by c.contributionDate asc, c.createdAt asc
+            """)
+    List<GoalContribution> findAllForProjection(
+            @Param("goalId") UUID goalId,
+            @Param("userId") UUID userId
+    );
 }

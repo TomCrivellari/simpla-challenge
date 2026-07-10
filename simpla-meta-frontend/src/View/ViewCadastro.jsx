@@ -1,72 +1,27 @@
-import Button from 'react-bootstrap/Button';
-import Form from 'react-bootstrap/Form';
-import CabecalhoHome from '../Components/CabecalhoHome';
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { loginService, saveUser } from '../service/Services';
-import { useEffect } from 'react';
+import { useState } from "react";
+import Button from "react-bootstrap/Button";
+import Form from "react-bootstrap/Form";
+import { Link, useNavigate } from "react-router-dom";
+import CabecalhoHome from "../Components/CabecalhoHome";
+import { authApi } from "../service/Services";
 
 const ViewCadastro = () => {
-
-    const navigate = useNavigate()
-    const [token, setToken] = useState()
-
-    useEffect(() => {
-        const cadastrarAdmin = async () => {
-            try {
-                let resp = await loginService("admin", "123456")
-                setToken(resp?.access_token)
-            } catch {
-                setToken(null)
-            }
-        }
-
-        cadastrarAdmin()
-        
-    }, [])
-
-    const [dados, setDados] = useState({
-        "username": "",
-        "password": "",
-        "saldo": 0
-    })
-
-    const buttonCadastrar = async () => {
-        console.log(token)
-        if (token) {
-            try {
-                await saveUser(dados, token)
-            } catch {
-                // Permite navegar no frontend mesmo com o backend desligado.
-            }
-        }
-
-        navigate("/login")
-    }
-
-
-    return (
-        <div>
-            <CabecalhoHome />
-            <div className='hero-shell'>
-                <Form className='surface-card w-full max-w-md p-8 flex flex-col'>
-                    <p className="text-sm font-bold uppercase tracking-[0.18em] text-[#3271FF] mb-2">Simpla Meta</p>
-                    <h1 className="text-3xl font-black mb-6">Cadastro</h1>
-                    <Form.Group className="mb-3 w-full" controlId="formBasicEmail">
-                        <Form.Label>Usuario</Form.Label>
-                        <Form.Control type="text" value={dados.username} onChange={(e)=>{setDados({...dados, "username": e.target.value})}}/>
-                    </Form.Group>
-                    <Form.Group className="mb-4 w-full" controlId="formBasicPassword">
-                        <Form.Label>Senha</Form.Label>
-                        <Form.Control type="password" value={dados.password} onChange={(e)=>{setDados({...dados, "password": e.target.value})}}/>
-                    </Form.Group>
-                    <Button variant="success" className="w-full py-2" onClick={buttonCadastrar}>
-                        Cadastrar
-                    </Button>
-                </Form>
-            </div>
-        </div>
-    )
-}
-
-export default ViewCadastro
+  const [form, setForm] = useState({ fullName: "", email: "", password: "" });
+  const [error, setError] = useState(""); const [submitting, setSubmitting] = useState(false);
+  const navigate = useNavigate();
+  const submit = async (event) => {
+    event.preventDefault(); setError(""); setSubmitting(true);
+    try { await authApi.register(form); navigate("/login", { state: { registered: true } }); }
+    catch (err) { setError(err.message); } finally { setSubmitting(false); }
+  };
+  return <><CabecalhoHome /><div className="hero-shell"><Form onSubmit={submit} className="surface-card w-full max-w-md p-8">
+    <p className="eyebrow">Nova conta</p><h1 className="text-3xl font-black mb-6">Cadastro</h1>
+    <Form.Group className="mb-3"><Form.Label>Nome completo</Form.Label><Form.Control required minLength={3} maxLength={150} value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} /></Form.Group>
+    <Form.Group className="mb-3"><Form.Label>E-mail</Form.Label><Form.Control required type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></Form.Group>
+    <Form.Group className="mb-3"><Form.Label>Senha</Form.Label><Form.Control required type="password" minLength={8} maxLength={72} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} /><Form.Text>Use de 8 a 72 caracteres.</Form.Text></Form.Group>
+    {error && <div className="alert alert-danger py-2">{error}</div>}
+    <Button type="submit" variant="success" className="w-full py-2" disabled={submitting}>{submitting ? "Criando..." : "Criar conta"}</Button>
+    <p className="text-center mt-4 mb-0"><Link to="/login">Voltar ao login</Link></p>
+  </Form></div></>;
+};
+export default ViewCadastro;

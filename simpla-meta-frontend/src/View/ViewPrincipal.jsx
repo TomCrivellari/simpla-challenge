@@ -1,261 +1,31 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import CabecalhoPrincipal from "../Components/CabecalhoPrincipal";
-import Button from "react-bootstrap/Button";
-import HistoricoDeReceitas from "../Components/HistoricoDeReceitas";
-import HistoricoDeDespesas from "../Components/HistoricoDeDespesas";
-import GraficoReceitas from "../Components/GraficoReceitas";
-import GraficoDespesas from "../Components/GraficoDespesas";
-import GraficoPizzaReceitas from "../Components/GraficoPizzaReceitas";
-import GraficoPizzaDespesas from "../Components/GraficoPizzaDespesas";
 import { useAuth } from "../context/AuthProvider";
-import { buscaUserAPI, getDespesas, getReceitas, saveDespesa, saveReceita } from "../service/Services";
+import { financeApi, goalsApi } from "../service/Services";
 
+const money = (value = 0) => Number(value).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const ViewPrincipal = () => {
-
-    const {user} = useAuth()
-
-    const [saldo, setSaldo] = useState(0);
-    const [receitas, setReceitas] = useState([]);
-    const [despesas, setDespesas] = useState([]);
-
-
-    useEffect(() => {
-        const carregarDados = async () => {
-            if (user == null) {
-                return;
-            }
-
-            try {
-                let receitasBuscadas = await getReceitas(user.id, user.token);
-                let despesasBuscadas = await getDespesas(user.id, user.token);
-                let userBuscado = await buscaUserAPI(user.nome, user.token)
-                
-
-                if (receitasBuscadas == null || despesasBuscadas == null || userBuscado == null) {
-                    return;
-                }
-
-                let saldo = userBuscado[0].saldo
-                receitasBuscadas.forEach(item => {
-                    saldo += item.valor
-                });
-
-                despesasBuscadas.forEach(item => {
-                    saldo -= item.valor
-                });
-
-                setSaldo(saldo);
-                setReceitas(receitasBuscadas);
-                setDespesas(despesasBuscadas);
-            } catch {
-                return;
-            }
-        };
-
-        carregarDados();
-    }, []);
-
-    const carregarDados = async () => {
-        if (user == null) {
-            return;
-        }
-
-        try {
-            let receitasBuscadas = await getReceitas(user.id, user.token);
-            let despesasBuscadas = await getDespesas(user.id, user.token);
-            let userBuscado = await buscaUserAPI(user.nome, user.token)
-
-            if (receitasBuscadas == null || despesasBuscadas == null || userBuscado == null) {
-                return;
-            }
-
-            let saldo = userBuscado[0].saldo
-
-            receitasBuscadas.forEach(item => {
-                saldo += item.valor
-            });
-
-            despesasBuscadas.forEach(item => {
-                saldo -= item.valor
-            });
-
-            setSaldo(saldo);
-            setReceitas(receitasBuscadas);
-            setDespesas(despesasBuscadas);
-        } catch {
-            return;
-        }
-    };
-
-    const [mostrarFormularioReceita, setMostrarFormularioReceita] = useState(false);
-    const [receita, setReceita] = useState({
-        "descricao": "",
-        "valor": "",
-        "tipo": "",
-        "idUser": user?.id || null
-    })
-
-    const [mostrarFormularioDespesa, setMostrarFormularioDespesa] = useState(false);
-    const [despesa, setDesepesa] = useState({
-        "descricao": "",
-        "valor": "",
-        "tipo": "",
-        "idUser": user?.id || null
-    })
-
-
-    const adicionarReceita = async () => {
-        const valorNumerico = parseFloat(receita.valor);
-        if (receita.descricao && !isNaN(valorNumerico) && valorNumerico > 0) {
-            const novaReceita = {...receita, "id": Date.now(), "valor": valorNumerico, "idUser": user?.id || null}
-
-            if (user != null) {
-                try {
-                    await saveReceita(novaReceita, user.token)
-                    await carregarDados()
-                } catch {
-                    setReceitas([...receitas, novaReceita])
-                    setSaldo(saldo + valorNumerico)
-                }
-            } else {
-                setReceitas([...receitas, novaReceita])
-                setSaldo(saldo + valorNumerico)
-            }
-
-            fecharFormularioReceita();
-        } else {
-            alert("Por favor, preencha o nome e um valor válido para a receita.");
-        }
-    };
-
-    const fecharFormularioReceita = () => {
-        setMostrarFormularioReceita(false);
-        setReceita({...receita, "descricao": "", "valor": "", "tipo": ""})
-    };
-
-    const adicionarDespesa = async () => {
-        const valorNumerico = parseFloat(despesa.valor);
-        if (despesa.descricao && !isNaN(valorNumerico) && valorNumerico > 0) {
-            const novaDespesa = {...despesa, "id": Date.now(), "valor": valorNumerico, "idUser": user?.id || null}
-
-            if (user != null) {
-                try {
-                    await saveDespesa(novaDespesa, user.token)
-                    await carregarDados()
-                } catch {
-                    setDespesas([...despesas, novaDespesa])
-                    setSaldo(saldo - valorNumerico)
-                }
-            } else {
-                setDespesas([...despesas, novaDespesa])
-                setSaldo(saldo - valorNumerico)
-            }
-
-            fecharFormularioDespesa();
-        } else {
-            alert("Por favor, preencha o nome e um valor válido para a receita.");
-        }
-    };
-
-    const fecharFormularioDespesa = () => {
-        setMostrarFormularioDespesa(false);
-        setDesepesa({...despesa, "descricao": "", "valor": "", "tipo": ""})
-    };
-
-    return (
-        <>
-            <CabecalhoPrincipal />
-            <div className="app-shell flex justify-center p-4 md:p-12">
-                <div className="w-full max-w-6xl">
-                    <div className="mb-8">
-                        <p className="text-sm font-bold uppercase tracking-[0.18em] text-[#3271FF] mb-2">Painel financeiro</p>
-                        <h1 className="text-4xl font-black text-[#05070d]">Visão geral da carteira</h1>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-10">
-                        <div className="metric-card p-7">
-                            <legend className="text-sm font-bold uppercase tracking-[0.16em] text-[#5d6678]">Saldo Atual</legend>
-                            <p className="text-5xl font-black text-[#05070d] mt-3 mb-2">
-                                {saldo.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                            </p>
-                            <span className="text-[#5d6678]">Saldo consolidado com receitas e despesas.</span>
-                        </div>
-
-                        <div className="surface-card p-6 flex flex-col gap-4">
-                            <div className="grid grid-cols-2 gap-4">
-                                <Button variant="success" className="py-2" onClick={() => setMostrarFormularioReceita(true)} disabled={mostrarFormularioReceita}>
-                                    Adicionar Receita
-                                </Button>
-                                <Button variant="danger" className="py-2" onClick={() => setMostrarFormularioDespesa(true)} disabled={mostrarFormularioDespesa}>
-                                    Adicionar Despesa
-                                </Button>
-                            </div>
-
-                            {mostrarFormularioReceita && (
-                                <div className="flex flex-col gap-2 p-4 rounded-2xl bg-[#f4fbff] border border-[#cceaff] mt-2">
-                                    <h3 className="font-black text-[#05070d]">Nova Receita</h3>
-                                    <input type="text" placeholder="Descrição" value={receita.descricao} onChange={(e) => {setReceita({...receita, "descricao": e.target.value})}} className="border p-2 rounded" />
-                                    <input type="number" placeholder="Valor" value={receita.valor} onChange={(e) => {setReceita({...receita, "valor": parseInt(e.target.value)})}} className="border p-2 rounded" />
-                                    <select className="border p-2 rounded" value={receita.tipo} onChange={(e) => {setReceita({...receita, "tipo": e.target.value})}}>
-                                        <option>Tipo</option>
-                                        <option value="Salario">Salario</option>
-                                        <option value="Tranferencias">Tranferencias</option>
-                                        <option value="Outros">Outros</option>
-                                    </select>
-                                    <div className="flex gap-2 justify-end mt-2">
-                                        <Button variant="outline-success" size="sm" onClick={adicionarReceita}>Salvar</Button>
-                                        <Button variant="outline-secondary" size="sm" onClick={fecharFormularioReceita}>Cancelar</Button>
-                                    </div>
-                                </div>
-                            )}
-
-                            {mostrarFormularioDespesa && (
-                                <div className="flex flex-col gap-2 p-4 rounded-2xl bg-white border border-[#dfe8f6] mt-2">
-                                    <h3 className="font-black text-[#05070d]">Nova Despesa</h3>
-                                    <input type="text" placeholder="Descrição" value={despesa.descricao} onChange={(e) => {setDesepesa({...despesa, "descricao": e.target.value})}} className="border p-2 rounded" />
-                                    <input type="number" placeholder="Valor" value={despesa.valor} onChange={(e) => {setDesepesa({...despesa, "valor": parseInt(e.target.value)})}} className="border p-2 rounded" />
-                                    <select className="border p-2 rounded" value={despesa.tipo} onChange={(e) => {setDesepesa({...despesa, "tipo": e.target.value})}}>
-                                        <option>Tipo</option>
-                                        <option value="Aluguel">Aluguel</option>
-                                        <option value="Luz/Agua">Luz/Agua</option>
-                                        <option value="Alimentação">Alimentação</option>
-                                        <option value="Outros">Outros</option>
-                                    </select>
-                                    <div className="flex gap-2 justify-end mt-2">
-                                        <Button variant="outline-danger" size="sm" onClick={adicionarDespesa}>Salvar</Button>
-                                        <Button variant="outline-secondary" size="sm" onClick={fecharFormularioDespesa}>Cancelar</Button>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-10">
-                        <HistoricoDeReceitas receitas={receitas}/>
-                        <HistoricoDeDespesas despesas={despesas}/>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
-                        <div className="chart-panel">
-                            <GraficoReceitas receitas={receitas}/>
-                        </div>
-                        <div className="chart-panel">
-                            <GraficoDespesas despesas={despesas}/>
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                        <div className="chart-panel h-[430px]">
-                            <GraficoPizzaReceitas receitas={receitas}/>
-                        </div>
-                        <div className="chart-panel h-[430px]">
-                            <GraficoPizzaDespesas despesas={despesas}/>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </>
-    );
+  const { token, user } = useAuth(); const [dashboard, setDashboard] = useState(null); const [goals, setGoals] = useState([]); const [error, setError] = useState("");
+  useEffect(() => { Promise.all([financeApi.dashboard(token), goalsApi.list(token)]).then(([d, g]) => { setDashboard(d); setGoals(g); }).catch((e) => setError(e.message)); }, [token]);
+  return <><CabecalhoPrincipal /><main className="app-shell p-6 md:p-10"><div className="max-w-6xl mx-auto">
+    <p className="eyebrow">Olá, {user?.fullName}</p><h1 className="text-4xl font-black mb-2">Sua visão financeira</h1><p className="text-secondary mb-8">Saldo, movimentações recentes e progresso das suas metas.</p>
+    {error && <div className="alert alert-danger">{error}</div>}
+    <div className="grid md:grid-cols-3 gap-5 mb-8">
+      <div className="metric-card p-6"><span>Saldo atual</span><strong className="metric-value">{money(dashboard?.balance)}</strong></div>
+      <div className="metric-card p-6"><span>Total de receitas</span><strong className="metric-value text-success">{money(dashboard?.totalIncomes)}</strong></div>
+      <div className="metric-card p-6"><span>Total de despesas</span><strong className="metric-value text-danger">{money(dashboard?.totalExpenses)}</strong></div>
+    </div>
+    <div className="grid lg:grid-cols-2 gap-6">
+      <section className="surface-card p-6"><div className="section-heading"><h2>Movimentações recentes</h2><Link to="/transacoes">Ver todas</Link></div>
+        {(dashboard?.recentTransactions || []).map((item) => <div className="list-row" key={item.id}><div><strong>{item.description}</strong><small>{item.category || "Sem categoria"} · {new Date(`${item.transactionDate}T12:00:00`).toLocaleDateString("pt-BR")}</small></div><strong className={item.type === "INCOME" ? "text-success" : "text-danger"}>{item.type === "INCOME" ? "+ " : "- "}{money(item.amount)}</strong></div>)}
+        {!dashboard?.recentTransactions?.length && <p className="empty-state">Nenhuma transação cadastrada.</p>}
+      </section>
+      <section className="surface-card p-6"><div className="section-heading"><h2>Metas em andamento</h2><Link to="/metas">Gerenciar</Link></div>
+        {goals.slice(0, 4).map((goal) => <div className="goal-preview" key={goal.id}><div className="flex justify-between"><strong>{goal.name}</strong><span>{Number(goal.progressPercentage).toFixed(0)}%</span></div><div className="progress-track"><span style={{ width: `${Math.min(100, Number(goal.progressPercentage))}%` }} /></div><small>{money(goal.currentAmount)} de {money(goal.targetAmount)}</small></div>)}
+        {!goals.length && <p className="empty-state">Crie sua primeira meta manualmente ou com o assistente.</p>}
+      </section>
+    </div>
+  </div></main></>;
 };
-
 export default ViewPrincipal;
