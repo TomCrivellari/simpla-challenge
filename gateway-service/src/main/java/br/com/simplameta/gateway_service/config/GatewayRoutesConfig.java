@@ -53,6 +53,16 @@ public class GatewayRoutesConfig {
     }
 
     @Bean
+    public RouterFunction<ServerResponse> aiRoutes(
+            @Value("${services.ai.url}") String aiServiceUrl
+    ) {
+        return route("ai-service")
+                .route(path("/api/v1/ai/**"), http())
+                .before(uri(aiServiceUrl))
+                .build();
+    }
+
+    @Bean
     public RouterFunction<ServerResponse> authSwaggerRoute(
             @Value("${services.auth.url}") String authServiceUrl
     ) {
@@ -82,6 +92,17 @@ public class GatewayRoutesConfig {
                 .route(path("/swagger/meta/api-docs"), http())
                 .before(uri(metaServiceUrl))
                 .before(rewritePath("/swagger/meta/api-docs", "/api-docs"))
+                .build();
+    }
+
+    @Bean
+    public RouterFunction<ServerResponse> aiSwaggerRoute(
+            @Value("${services.ai.url}") String aiServiceUrl
+    ) {
+        return route("ai-swagger-docs")
+                .route(path("/swagger/ai/api-docs"), http())
+                .before(uri(aiServiceUrl))
+                .before(rewritePath("/swagger/ai/api-docs", "/api-docs"))
                 .build();
     }
 }
