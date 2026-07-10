@@ -14,21 +14,5 @@ services:
     volumes:
       - auth_database_data:/var/lib/postgresql/data
 
-  finance-database:
-    image: postgres:17-alpine
-    container_name: finance-database
-
-    environment:
-      POSTGRES_DB: finance_db
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-
-    ports:
-      - "5434:5432"
-
-    volumes:
-      - finance_database_data:/var/lib/postgresql/data
-
 volumes:
   auth_database_data:
-  finance_database_data:
