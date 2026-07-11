@@ -13,6 +13,19 @@ import java.util.Map;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    @ExceptionHandler(UserNotRegisteredException.class)
+    public ResponseEntity<ErrorResponse> handleUserNotRegistered(
+            UserNotRegisteredException exception
+    ) {
+        return ResponseEntity
+                .status(HttpStatus.NOT_FOUND)
+                .body(ErrorResponse.of(
+                        HttpStatus.NOT_FOUND.value(),
+                        HttpStatus.NOT_FOUND.getReasonPhrase(),
+                        exception.getMessage()
+                ));
+    }
+
     @ExceptionHandler(InvalidLoginCredentialsException.class)
     public ResponseEntity<ErrorResponse> handleInvalidLoginCredentials(
             InvalidLoginCredentialsException exception

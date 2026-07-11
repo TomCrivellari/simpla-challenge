@@ -94,26 +94,82 @@ Os serviços backend seguem uma separação por `controller`, `service`, `reposi
 
 ## Pré-requisitos
 
-Instale antes de iniciar:
+Para a execução recomendada de toda a aplicação, instale apenas:
+
+- Docker com Docker Compose.
+
+Para executar os módulos manualmente durante o desenvolvimento, também são necessários:
 
 - Java JDK 21;
-- Docker com Docker Compose;
 - Node.js 20 ou superior;
 - npm 10 ou superior;
-- uma chave da API Gemini para utilizar o assistente de IA.
+- uma chave da API Gemini, caso queira utilizar o assistente de IA.
 
 Não é necessário instalar Maven globalmente, pois cada serviço contém Maven Wrapper (`mvnw`).
 
 ## Como executar localmente
 
-### 1. Clone e acesse o projeto
+### Início rápido: aplicação completa com Docker
+
+Este é o fluxo recomendado para avaliar o projeto. Ele inicia o frontend, os cinco serviços backend e os três bancos de dados com um único comando.
+
+Clone e acesse o projeto:
 
 ```bash
 git clone <URL_DO_REPOSITORIO>
 cd simpla-challenge
 ```
 
-### 2. Inicie os bancos de dados
+Opcionalmente, crie o arquivo de configuração para habilitar o assistente de IA:
+
+```bash
+cp .env.example .env
+```
+
+Edite o `.env` e preencha `GEMINI_API_KEY`. Sem essa chave, toda a aplicação continua funcionando, exceto as respostas do assistente de IA.
+
+Inicie todo o ambiente:
+
+```bash
+docker compose up --build
+```
+
+Na primeira execução, o Docker fará o download das imagens e compilará os serviços, portanto o processo pode levar alguns minutos. Quando os containers estiverem ativos, acesse:
+
+- Aplicação: [http://localhost:5173](http://localhost:5173)
+- Swagger agregado: [http://localhost:5173/swagger-ui.html](http://localhost:5173/swagger-ui.html)
+
+Para executar em segundo plano:
+
+```bash
+docker compose up --build -d
+```
+
+Para acompanhar os logs:
+
+```bash
+docker compose logs -f
+```
+
+Para encerrar todos os serviços:
+
+```bash
+docker compose down
+```
+
+Os dados permanecem nos volumes Docker. Para encerrar e apagar também os bancos locais:
+
+```bash
+docker compose down --volumes
+```
+
+> `docker compose down --volumes` apaga definitivamente os dados persistidos nos três bancos.
+
+### Execução manual para desenvolvimento
+
+Use esta alternativa caso queira executar ou depurar cada módulo separadamente.
+
+#### 1. Inicie os bancos de dados
 
 Na raiz do projeto, execute:
 
@@ -133,7 +189,7 @@ docker compose -f finance-service/docker-compose.yml ps
 docker compose -f meta-service/docker-compose.yml ps
 ```
 
-### 3. Configure o serviço de IA
+#### 2. Configure o serviço de IA
 
 Crie o arquivo local a partir do exemplo:
 
@@ -150,7 +206,7 @@ GEMINI_MODEL=gemini-3-flash-preview
 
 O restante da aplicação pode funcionar sem a chave, mas as requisições ao assistente de IA não serão concluídas.
 
-### 4. Inicie os serviços backend
+#### 3. Inicie os serviços backend
 
 Abra um terminal para cada comando, a partir da raiz do repositório:
 
@@ -183,7 +239,7 @@ No Windows, substitua `./mvnw` por `mvnw.cmd`.
 
 > Inicie os serviços a partir das próprias pastas. Isso é especialmente importante para o AI Service, que carrega o arquivo `.env` do diretório atual.
 
-### 5. Inicie o frontend
+#### 4. Inicie o frontend
 
 Em outro terminal:
 
@@ -217,6 +273,8 @@ Todos os valores possuem padrões adequados ao ambiente local, exceto a chave Ge
 | `VITE_API_URL` | Frontend | `/api/v1` |
 
 > O valor de `JWT_SECRET` precisa ser idêntico no Auth, Gateway, Finance, Meta e AI. O padrão existente serve apenas para desenvolvimento; use um segredo longo e seguro em outros ambientes.
+
+Na execução com Docker Compose, copie o arquivo `.env.example` da raiz para `.env`. O Compose distribui automaticamente `JWT_SECRET`, `GEMINI_API_KEY` e `GEMINI_MODEL` aos containers e configura as URLs internas e os bancos. O arquivo `.env` não é versionado.
 
 Exemplo de execução com configurações personalizadas:
 
@@ -273,9 +331,10 @@ curl -X POST http://localhost:8084/api/v1/auth/login \
 
 Com todos os serviços ativos, a documentação agregada fica disponível em:
 
-- Gateway: [http://localhost:8084/swagger-ui.html](http://localhost:8084/swagger-ui.html)
+- Com Docker Compose: [http://localhost:5173/swagger-ui.html](http://localhost:5173/swagger-ui.html)
+- Na execução manual: [http://localhost:8084/swagger-ui.html](http://localhost:8084/swagger-ui.html)
 
-Documentações individuais:
+Na execução manual, as documentações individuais também ficam disponíveis:
 
 - Auth: [http://localhost:8081/swagger-ui.html](http://localhost:8081/swagger-ui.html)
 - Finance: [http://localhost:8082/swagger-ui.html](http://localhost:8082/swagger-ui.html)
@@ -316,7 +375,13 @@ npm run build
 
 ## Encerrando o ambiente
 
-Interrompa os processos Spring Boot e Vite com `Ctrl+C`. Depois, desligue os bancos:
+Se estiver usando a execução completa recomendada:
+
+```bash
+docker compose down
+```
+
+Se estiver usando a execução manual, interrompa os processos Spring Boot e Vite com `Ctrl+C`. Depois, desligue os bancos:
 
 ```bash
 docker compose -f auth-service/docker-compose.yml down

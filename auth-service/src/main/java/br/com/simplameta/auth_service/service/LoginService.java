@@ -4,6 +4,7 @@ import br.com.simplameta.auth_service.dto.request.LoginRequest;
 import br.com.simplameta.auth_service.dto.response.LoginResponse;
 import br.com.simplameta.auth_service.exception.AccountUnavailableException;
 import br.com.simplameta.auth_service.exception.InvalidLoginCredentialsException;
+import br.com.simplameta.auth_service.exception.UserNotRegisteredException;
 import br.com.simplameta.auth_service.model.User;
 import br.com.simplameta.auth_service.model.UserStatus;
 import br.com.simplameta.auth_service.repository.UserRepository;
@@ -25,7 +26,7 @@ public class LoginService {
     @Transactional
     public LoginResponse login(LoginRequest request) {
         User user = userRepository.findByEmailIgnoreCase(normalizeEmail(request.email()))
-                .orElseThrow(InvalidLoginCredentialsException::new);
+                .orElseThrow(UserNotRegisteredException::new);
 
         validateAccountAvailability(user);
         validatePassword(user, request.password());

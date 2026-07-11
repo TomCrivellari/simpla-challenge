@@ -1,0 +1,137 @@
+name: simpla-meta
+
+x-backend-environment: &backend-environment
+  JWT_SECRET: ${JWT_SECRET:-change-me-to-a-secure-256-bit-secret-key-for-local-development}
+
+services:
+  auth-database:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: auth_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - auth_database_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d auth_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  finance-database:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: finance_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - finance_database_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d finance_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  meta-database:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: meta_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - meta_database_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d meta_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  auth-service:
+    build: ./auth-service
+    environment:
+      <<: *backend-environment
+      DB_URL: jdbc:postgresql://auth-database:5432/auth_db
+      DB_USERNAME: postgres
+      DB_PASSWORD: postgres
+    depends_on:
+      auth-database:
+        condition: service_healthy
+    restart: unless-stopped
+
+  finance-service:
+    build: ./finance-service
+    environment:
+      <<: *backend-environment
+      DB_URL: jdbc:postgresql://finance-database:5432/finance_db
+      DB_USERNAME: postgres
+      DB_PASSWORD: postgres
+    depends_on:
+      finance-database:
+        condition: service_healthy
+    restart: unless-stopped
+
+  meta-service:
+    build: ./meta-service
+    environment:
+      <<: *backend-environment
+      DB_URL: jdbc:postgresql://meta-database:5432/meta_db
+      DB_USERNAME: postgres
+      DB_PASSWORD: postgres
+      FINANCE_SERVICE_URL: http://finance-service:8082
+    depends_on:
+      meta-database:
+        condition: service_healthy
+      finance-service:
+        condition: service_started
+    restart: unless-stopped
+
+  ai-service:
+    build: ./ai-service
+    environment:
+      <<: *backend-environment
+      FINANCE_SERVICE_URL: http://finance-service:8082
+      META_SERVICE_URL: http://meta-service:8083
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3-flash-preview}
+    depends_on:
+      finance-service:
+        condition: service_started
+      meta-service:
+        condition: service_started
+    restart: unless-stopped
+
+  gateway-service:
+    build: ./gateway-service
+    environment:
+      <<: *backend-environment
+      AUTH_SERVICE_URL: http://auth-service:8081
+      FINANCE_SERVICE_URL: http://finance-service:8082
+      META_SERVICE_URL: http://meta-service:8083
+      AI_SERVICE_URL: http://ai-service:8085
+    depends_on:
+      auth-service:
+        condition: service_started
+      finance-service:
+        condition: service_started
+      meta-service:
+        condition: service_started
+      ai-service:
+        condition: service_started
+    restart: unless-stopped
+
+  frontend:
+    build: ./simpla-meta-frontend
+    ports:
+      - "5173:80"
+    depends_on:
+      gateway-service:
+        condition: service_started
+    restart: unless-stopped
+
+volumes:
+  auth_database_data:
+  finance_database_data:
+  meta_database_data:
