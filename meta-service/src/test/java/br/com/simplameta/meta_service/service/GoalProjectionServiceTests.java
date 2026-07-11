@@ -45,6 +45,48 @@ class GoalProjectionServiceTests {
         assertThat(projection.overdueAmount()).isEqualByComparingTo("300.00");
     }
 
+    @Test
+    void excessInOneMonthDoesNotPayAnotherMonthsDelay() {
+        FinancialGoal goal = goalCreatedMonthsAgo(new BigDecimal("1000.00"), 2, YearMonth.now().plusMonths(2));
+        GoalContribution excessInFirstMonth = contribution(
+                "400.00",
+                YearMonth.now().minusMonths(2).atDay(10)
+        );
+
+        var projection = service.calculateMonthlyProjection(goal, List.of(excessInFirstMonth));
+
+        assertThat(projection.monthlyTarget()).isEqualByComparingTo("200.00");
+        assertThat(projection.overdueAmount()).isEqualByComparingTo("200.00");
+        assertThat(projection.currentMonthRemaining()).isEqualByComparingTo("200.00");
+    }
+
+    @Test
+    void currentMonthRestartsAtOriginalMonthlyTarget() {
+        FinancialGoal goal = goalCreatedMonthsAgo(new BigDecimal("1000.00"), 1, YearMonth.now().plusMonths(3));
+        GoalContribution previousMonth = contribution(
+                "200.00",
+                YearMonth.now().minusMonths(1).atDay(10)
+        );
+
+        var projection = service.calculateMonthlyProjection(goal, List.of(previousMonth));
+
+        assertThat(projection.monthlyTarget()).isEqualByComparingTo("200.00");
+        assertThat(projection.currentMonthContributed()).isEqualByComparingTo("0.00");
+        assertThat(projection.currentMonthRemaining()).isEqualByComparingTo("200.00");
+        assertThat(projection.overdueAmount()).isEqualByComparingTo("0.00");
+    }
+
+    @Test
+    void completedGoalHasNoMonthlyRemainingOrOverdueAmount() {
+        FinancialGoal goal = goalCreatedMonthsAgo(new BigDecimal("1000.00"), 1, YearMonth.now().plusMonths(3));
+        GoalContribution total = contribution("1000.00", LocalDate.now());
+
+        var projection = service.calculateMonthlyProjection(goal, List.of(total));
+
+        assertThat(projection.currentMonthRemaining()).isEqualByComparingTo("0.00");
+        assertThat(projection.overdueAmount()).isEqualByComparingTo("0.00");
+    }
+
     private FinancialGoal goal(BigDecimal target, YearMonth deadline) {
         return goalCreatedMonthsAgo(target, 0, deadline);
     }

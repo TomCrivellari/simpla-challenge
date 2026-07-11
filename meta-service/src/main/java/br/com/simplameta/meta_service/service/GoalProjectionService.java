@@ -62,14 +62,26 @@ public class GoalProjectionService {
         long elapsedClosedMonths = currentMonth.isAfter(startMonth)
                 ? Math.min(plannedMonths, ChronoUnit.MONTHS.between(startMonth, currentMonth))
                 : 0;
-        BigDecimal expectedBeforeCurrentMonth = monthlyTarget.multiply(BigDecimal.valueOf(elapsedClosedMonths));
-        BigDecimal contributedBeforeCurrentMonth = contributions.stream()
-                .filter(item -> YearMonth.from(item.getContributionDate()).isBefore(currentMonth))
+        // Cada competencia e independente. Um aporte excedente feito em um mes
+        // reduz o saldo total da meta, mas nao quita a mensalidade de outro mes.
+        BigDecimal overdueAmount = BigDecimal.ZERO;
+        for (long monthIndex = 0; monthIndex < elapsedClosedMonths; monthIndex++) {
+            YearMonth closedMonth = startMonth.plusMonths(monthIndex);
+            BigDecimal contributedInClosedMonth = sumForMonth(contributions, closedMonth);
+            overdueAmount = overdueAmount.add(
+                    monthlyTarget.subtract(contributedInClosedMonth).max(BigDecimal.ZERO)
+            );
+        }
+
+        BigDecimal totalContributed = contributions.stream()
                 .map(GoalContribution::getAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
-        BigDecimal overdueAmount = expectedBeforeCurrentMonth.subtract(contributedBeforeCurrentMonth).max(BigDecimal.ZERO);
+        boolean goalCompleted = totalContributed.compareTo(goal.getTargetAmount()) >= 0;
 
-        if (currentMonth.isAfter(deadlineMonth)) {
+        if (goalCompleted) {
+            currentMonthRemaining = BigDecimal.ZERO;
+            overdueAmount = BigDecimal.ZERO;
+        } else if (currentMonth.isAfter(deadlineMonth)) {
             currentMonthRemaining = BigDecimal.ZERO;
             currentMonthExtra = contributedThisMonth;
         }
