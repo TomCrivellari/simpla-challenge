@@ -1,9 +1,9 @@
 package br.com.simplameta.ai_service.service;
 
-import br.com.simplameta.ai_service.config.OpenAiProperties;
+import br.com.simplameta.ai_service.config.GeminiProperties;
 import br.com.simplameta.ai_service.dto.request.ChatMessageRequest;
 import br.com.simplameta.ai_service.dto.response.AiChatResponse;
-import br.com.simplameta.ai_service.exception.OpenAiServiceException;
+import br.com.simplameta.ai_service.exception.GeminiServiceException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
@@ -20,27 +20,22 @@ import java.util.List;
 import java.util.Map;
 
 @Service
-public class OpenAiClientService {
+public class GeminiClientService {
 
     private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(40);
 
     private final HttpClient httpClient;
     private final ObjectMapper objectMapper;
     private final String apiKey;
-    private final String apiUrl;
-    private final String model;
+    private final String generateContentUrl;
 
-    public OpenAiClientService(
-            ObjectMapper objectMapper,
-            OpenAiProperties openAiProperties
-    ) {
+    public GeminiClientService(ObjectMapper objectMapper, GeminiProperties properties) {
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(10))
                 .build();
         this.objectMapper = objectMapper;
-        this.apiKey = openAiProperties.apiKey();
-        this.apiUrl = openAiProperties.apiUrl();
-        this.model = openAiProperties.model();
+        this.apiKey = properties.apiKey();
+        this.generateContentUrl = properties.generateContentUrl();
     }
 
     public AiChatResponse createChatResponse(
@@ -48,15 +43,15 @@ public class OpenAiClientService {
             FinancialContextService.FinancialContext financialContext
     ) {
         if (apiKey == null || apiKey.isBlank()) {
-            throw new OpenAiServiceException("OPENAI_API_KEY is not configured");
+            throw new GeminiServiceException("GEMINI_API_KEY não está configurada");
         }
 
         try {
             String requestBody = objectMapper.writeValueAsString(buildRequest(messages, financialContext));
             HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(apiUrl))
+                    .uri(URI.create(generateContentUrl))
                     .timeout(REQUEST_TIMEOUT)
-                    .header("Authorization", "Bearer " + apiKey)
+                    .header("x-goog-api-key", apiKey)
                     .header("Content-Type", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString(requestBody))
                     .build();
@@ -64,17 +59,15 @@ public class OpenAiClientService {
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
 
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
-                throw new OpenAiServiceException(openAiErrorMessage(response.statusCode(), response.body()));
+                throw new GeminiServiceException(geminiErrorMessage(response.statusCode(), response.body()));
             }
 
-            String outputText = extractOutputText(response.body());
-
-            return objectMapper.readValue(outputText, AiChatResponse.class);
+            return objectMapper.readValue(extractOutputText(response.body()), AiChatResponse.class);
         } catch (IOException exception) {
-            throw new OpenAiServiceException("Could not parse OpenAI response");
+            throw new GeminiServiceException("Não foi possível processar a resposta do Gemini");
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
-            throw new OpenAiServiceException("OpenAI request was interrupted");
+            throw new GeminiServiceException("A requisição ao Gemini foi interrompida");
         }
     }
 
@@ -82,49 +75,57 @@ public class OpenAiClientService {
             List<ChatMessageRequest> messages,
             FinancialContextService.FinancialContext financialContext
     ) {
-        List<Map<String, String>> input = new ArrayList<>();
-        input.add(message("user", "Contexto financeiro atual em JSON:\n" + toJson(financialContext)));
-
-        messages.forEach(chatMessage ->
-                input.add(message(chatMessage.role(), chatMessage.content()))
-        );
+        List<Map<String, Object>> contents = new ArrayList<>();
+        messages.forEach(message -> contents.add(Map.of(
+                "role", geminiRole(message.role()),
+                "parts", List.of(Map.of("text", message.content()))
+        )));
 
         Map<String, Object> request = new LinkedHashMap<>();
-        request.put("model", model);
-        request.put("instructions", systemPrompt());
-        request.put("input", input);
-        request.put("text", Map.of("format", responseFormat()));
-
+        request.put("systemInstruction", Map.of(
+                "parts", List.of(Map.of("text", systemPrompt(financialContext)))
+        ));
+        request.put("contents", contents);
+        request.put("generationConfig", Map.of(
+                "responseMimeType", "application/json",
+                "responseJsonSchema", responseSchema()
+        ));
         return request;
     }
 
-    private String systemPrompt() {
-        return """
-                Voce e um assistente financeiro da aplicacao Simpla Meta.
-                Ajude o usuario a planejar metas financeiras, decidir valor objetivo,
-                data limite e a melhor divisao de economia mensal, semanal e diaria.
-
-                Regras:
-                - Responda sempre em portugues do Brasil.
-                - Nao crie, edite ou exclua metas diretamente.
-                - O usuario sempre deve confirmar qualquer acao.
-                - Se faltarem valor objetivo, prazo ou nome da meta, faca perguntas objetivas.
-                - Use o saldo, metas existentes e despesas recentes apenas como contexto.
-                - Nao prometa rendimento financeiro nem aconselhamento de investimento.
-                - Retorne apenas JSON valido no schema solicitado.
-                """;
+    private String geminiRole(String role) {
+        return "assistant".equalsIgnoreCase(role) || "model".equalsIgnoreCase(role)
+                ? "model"
+                : "user";
     }
 
-    private Map<String, Object> responseFormat() {
+    private String systemPrompt(FinancialContextService.FinancialContext financialContext) {
+        return """
+                Você é um assistente financeiro da aplicação Simpla Meta.
+                Ajude o usuário a planejar metas financeiras, decidir valor objetivo,
+                data limite e a melhor divisão de economia mensal, semanal e diária.
+
+                Regras:
+                - Responda sempre em português do Brasil.
+                - Não crie, edite ou exclua metas diretamente.
+                - O usuário sempre deve confirmar qualquer ação.
+                - Se faltarem valor objetivo, prazo ou nome da meta, faça perguntas objetivas.
+                - Use o saldo, metas existentes e despesas recentes apenas como contexto.
+                - Não prometa rendimento financeiro nem aconselhamento de investimento.
+                - Para o plano mensal, conte os meses-calendário incluindo o mês atual e o mês do prazo.
+                - Calcule a parcela mensal dividindo o valor total pela quantidade desses meses.
+                - Retorne somente dados que atendam ao schema JSON solicitado.
+
+                Contexto financeiro atual em JSON:
+                """ + toJson(financialContext);
+    }
+
+    private Map<String, Object> responseSchema() {
         Map<String, Object> schema = new LinkedHashMap<>();
         schema.put("type", "object");
         schema.put("additionalProperties", false);
         schema.put("required", List.of(
-                "message",
-                "suggestedGoal",
-                "savingsPlan",
-                "followUpQuestions",
-                "actions"
+                "message", "suggestedGoal", "savingsPlan", "followUpQuestions", "actions"
         ));
         schema.put("properties", Map.of(
                 "message", Map.of("type", "string"),
@@ -162,13 +163,7 @@ public class OpenAiClientService {
                         )
                 )
         ));
-
-        return Map.of(
-                "type", "json_schema",
-                "name", "financial_goal_chat_response",
-                "strict", true,
-                "schema", schema
-        );
+        return schema;
     }
 
     private Map<String, Object> nullableObject(
@@ -176,80 +171,52 @@ public class OpenAiClientService {
             List<String> required
     ) {
         return Map.of(
-                "anyOf", List.of(
-                        Map.of(
-                                "type", "object",
-                                "additionalProperties", false,
-                                "required", required,
-                                "properties", properties
-                        ),
-                        Map.of("type", "null")
-                )
+                "type", List.of("object", "null"),
+                "additionalProperties", false,
+                "required", required,
+                "properties", properties
         );
-    }
-
-    private String openAiErrorMessage(int statusCode, String responseBody) {
-        try {
-            JsonNode message = objectMapper
-                    .readTree(responseBody)
-                    .path("error")
-                    .path("message");
-
-            if (message.isTextual()) {
-                return "OpenAI API returned status " + statusCode + ": " + message.asText();
-            }
-        } catch (IOException ignored) {
-            // Fall back to a generic message below.
-        }
-
-        return "OpenAI API returned status " + statusCode;
     }
 
     private Map<String, Object> arrayOfStrings() {
-        return Map.of(
-                "type", "array",
-                "items", Map.of("type", "string")
-        );
-    }
-
-    private Map<String, String> message(String role, String content) {
-        return Map.of(
-                "role", role,
-                "content", content
-        );
+        return Map.of("type", "array", "items", Map.of("type", "string"));
     }
 
     private String toJson(Object value) {
         try {
             return objectMapper.writeValueAsString(value);
         } catch (IOException exception) {
-            throw new OpenAiServiceException("Could not serialize financial context");
+            throw new GeminiServiceException("Não foi possível serializar o contexto financeiro");
         }
     }
 
-    private String extractOutputText(String responseBody) throws IOException {
-        JsonNode root = objectMapper.readTree(responseBody);
-        JsonNode outputText = root.get("output_text");
-
-        if (outputText != null && outputText.isTextual()) {
-            return outputText.asText();
+    private String geminiErrorMessage(int statusCode, String responseBody) {
+        try {
+            JsonNode message = objectMapper.readTree(responseBody).path("error").path("message");
+            if (message.isTextual()) {
+                return "Gemini API retornou status " + statusCode + ": " + message.asText();
+            }
+        } catch (IOException ignored) {
+            // Usa a mensagem genérica abaixo.
         }
+        return "Gemini API retornou status " + statusCode;
+    }
 
-        JsonNode output = root.get("output");
-        if (output != null && output.isArray()) {
-            for (JsonNode item : output) {
-                JsonNode content = item.get("content");
-                if (content != null && content.isArray()) {
-                    for (JsonNode contentItem : content) {
-                        JsonNode text = contentItem.get("text");
-                        if (text != null && text.isTextual()) {
-                            return text.asText();
-                        }
+    private String extractOutputText(String responseBody) throws IOException {
+        JsonNode candidates = objectMapper.readTree(responseBody).path("candidates");
+        if (candidates.isArray()) {
+            for (JsonNode candidate : candidates) {
+                JsonNode parts = candidate.path("content").path("parts");
+                if (parts.isArray()) {
+                    StringBuilder output = new StringBuilder();
+                    for (JsonNode part : parts) {
+                        JsonNode text = part.get("text");
+                        if (text != null && text.isTextual()) output.append(text.asText());
                     }
+                    if (!output.isEmpty()) return output.toString();
                 }
             }
         }
-
-        throw new OpenAiServiceException("OpenAI response did not include output text");
+        throw new GeminiServiceException("A resposta do Gemini não contém texto");
     }
 }

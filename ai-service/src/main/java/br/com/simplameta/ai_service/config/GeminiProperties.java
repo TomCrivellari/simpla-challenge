@@ -9,21 +9,21 @@ import java.nio.file.Path;
 import java.util.List;
 
 @Component
-public class OpenAiProperties {
+public class GeminiProperties {
 
-    private static final String OPENAI_API_KEY = "OPENAI_API_KEY";
+    private static final String GEMINI_API_KEY = "GEMINI_API_KEY";
 
     private final String apiKey;
     private final String apiUrl;
     private final String model;
 
-    public OpenAiProperties(
-            @Value("${openai.api-key:}") String configuredApiKey,
-            @Value("${openai.api-url}") String apiUrl,
-            @Value("${openai.model}") String model
+    public GeminiProperties(
+            @Value("${gemini.api-key:}") String configuredApiKey,
+            @Value("${gemini.api-url}") String apiUrl,
+            @Value("${gemini.model}") String model
     ) {
         this.apiKey = resolveApiKey(configuredApiKey);
-        this.apiUrl = apiUrl;
+        this.apiUrl = apiUrl.replaceAll("/+$", "");
         this.model = model;
     }
 
@@ -31,23 +31,15 @@ public class OpenAiProperties {
         return apiKey;
     }
 
-    public String apiUrl() {
-        return apiUrl;
-    }
-
-    public String model() {
-        return model;
+    public String generateContentUrl() {
+        return apiUrl + "/" + model + ":generateContent";
     }
 
     private String resolveApiKey(String configuredApiKey) {
-        if (hasText(configuredApiKey)) {
-            return configuredApiKey.trim();
-        }
+        if (hasText(configuredApiKey)) return configuredApiKey.trim();
 
-        String environmentValue = System.getenv(OPENAI_API_KEY);
-        if (hasText(environmentValue)) {
-            return environmentValue.trim();
-        }
+        String environmentValue = System.getenv(GEMINI_API_KEY);
+        if (hasText(environmentValue)) return environmentValue.trim();
 
         return findInDotEnv().trim();
     }
@@ -61,25 +53,20 @@ public class OpenAiProperties {
 
         for (Path candidate : candidates) {
             String value = readFromDotEnv(candidate);
-            if (hasText(value)) {
-                return value;
-            }
+            if (hasText(value)) return value;
         }
 
         return "";
     }
 
     private String readFromDotEnv(Path path) {
-        if (!Files.isRegularFile(path)) {
-            return "";
-        }
+        if (!Files.isRegularFile(path)) return "";
 
         try {
-            return Files.readAllLines(path)
-                    .stream()
+            return Files.readAllLines(path).stream()
                     .map(String::trim)
-                    .filter(line -> line.startsWith(OPENAI_API_KEY + "="))
-                    .map(line -> line.substring((OPENAI_API_KEY + "=").length()).trim())
+                    .filter(line -> line.startsWith(GEMINI_API_KEY + "="))
+                    .map(line -> line.substring((GEMINI_API_KEY + "=").length()).trim())
                     .map(this::stripQuotes)
                     .filter(this::hasText)
                     .findFirst()
@@ -94,7 +81,6 @@ public class OpenAiProperties {
                 || (value.startsWith("'") && value.endsWith("'"))) {
             return value.substring(1, value.length() - 1);
         }
-
         return value;
     }
 

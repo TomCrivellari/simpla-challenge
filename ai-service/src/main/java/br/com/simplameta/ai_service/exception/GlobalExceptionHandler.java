@@ -13,9 +13,9 @@ import java.util.Map;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    @ExceptionHandler(OpenAiServiceException.class)
-    public ResponseEntity<ErrorResponse> handleOpenAiService(
-            OpenAiServiceException exception
+    @ExceptionHandler(GeminiServiceException.class)
+    public ResponseEntity<ErrorResponse> handleGeminiService(
+            GeminiServiceException exception
     ) {
         return ResponseEntity
                 .status(HttpStatus.BAD_GATEWAY)
