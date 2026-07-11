@@ -39,6 +39,19 @@ public class GlobalExceptionHandler {
                 ));
     }
 
+    @ExceptionHandler(InsufficientBalanceException.class)
+    public ResponseEntity<ErrorResponse> handleInsufficientBalance(
+            InsufficientBalanceException exception
+    ) {
+        return ResponseEntity
+                .status(HttpStatus.UNPROCESSABLE_ENTITY)
+                .body(ErrorResponse.of(
+                        HttpStatus.UNPROCESSABLE_ENTITY.value(),
+                        HttpStatus.UNPROCESSABLE_ENTITY.getReasonPhrase(),
+                        exception.getMessage()
+                ));
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponse> handleMethodArgumentNotValid(
             MethodArgumentNotValidException exception

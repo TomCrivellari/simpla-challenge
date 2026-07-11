@@ -41,23 +41,19 @@ public class GoalContributionService {
     @Transactional
     public FinancialGoalResponse create(UUID userId, UUID goalId, String accessToken, GoalContributionRequest request) {
         FinancialGoal goal = goalService.findUserGoal(userId, goalId);
-        UUID financeTransactionId = null;
-
-        if (request.shouldAffectBalance()) {
-            financeTransactionId = financeTransactionService.createGoalContributionExpense(
-                    accessToken,
-                    goal,
-                    request.amount(),
-                    request.contributionDate()
-            );
-        }
+        UUID financeTransactionId = financeTransactionService.createGoalContributionExpense(
+                accessToken,
+                goal,
+                request.amount(),
+                request.contributionDate()
+        );
 
         GoalContribution contribution = GoalContribution.create(
                 goalId,
                 userId,
                 request.amount(),
                 request.description(),
-                request.shouldAffectBalance(),
+                true,
                 financeTransactionId,
                 request.contributionDate()
         );

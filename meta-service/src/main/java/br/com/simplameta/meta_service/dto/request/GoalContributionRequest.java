@@ -17,13 +17,6 @@ public record GoalContributionRequest(
         String description,
 
         @NotNull(message = "Contribution date is required")
-        LocalDate contributionDate,
+        LocalDate contributionDate
 
-        Boolean affectBalance
-
-) {
-
-    public boolean shouldAffectBalance() {
-        return affectBalance == null || affectBalance;
-    }
-}
+) { }

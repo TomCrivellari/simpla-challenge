@@ -44,6 +44,9 @@ public class FinanceTransactionService {
 
             return response.id();
         } catch (FeignException exception) {
+            if (exception.status() == 422) {
+                throw new br.com.simplameta.meta_service.exception.InsufficientBalanceException();
+            }
             throw new FinanceServiceCommunicationException();
         }
     }

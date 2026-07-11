@@ -3,7 +3,9 @@ package br.com.simplameta.finance_service.service;
 import br.com.simplameta.finance_service.dto.request.TransactionRequest;
 import br.com.simplameta.finance_service.dto.response.TransactionResponse;
 import br.com.simplameta.finance_service.exception.TransactionNotFoundException;
+import br.com.simplameta.finance_service.exception.InsufficientBalanceException;
 import br.com.simplameta.finance_service.model.Transaction;
+import br.com.simplameta.finance_service.model.TransactionType;
 import br.com.simplameta.finance_service.repository.TransactionRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Sort;
@@ -11,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.math.BigDecimal;
 import java.util.UUID;
 
 @Service
@@ -40,6 +43,8 @@ public class TransactionService {
 
     @Transactional
     public TransactionResponse create(UUID userId, TransactionRequest request) {
+        validateAvailableBalance(userId, request, null);
+
         Transaction transaction = Transaction.create(
                 userId,
                 request.type(),
@@ -57,6 +62,7 @@ public class TransactionService {
     @Transactional
     public TransactionResponse update(UUID userId, UUID transactionId, TransactionRequest request) {
         Transaction transaction = findUserTransaction(userId, transactionId);
+        validateAvailableBalance(userId, request, transaction);
 
         transaction.update(
                 request.type(),
@@ -82,5 +88,33 @@ public class TransactionService {
         return transactionRepository
                 .findByIdAndUserId(transactionId, userId)
                 .orElseThrow(() -> new TransactionNotFoundException(transactionId));
+    }
+
+    private void validateAvailableBalance(
+            UUID userId,
+            TransactionRequest request,
+            Transaction currentTransaction
+    ) {
+        BigDecimal balance = currentBalance(userId);
+
+        if (currentTransaction != null) {
+            balance = currentTransaction.getType() == TransactionType.INCOME
+                    ? balance.subtract(currentTransaction.getAmount())
+                    : balance.add(currentTransaction.getAmount());
+        }
+
+        BigDecimal resultingBalance = request.type() == TransactionType.INCOME
+                ? balance.add(request.amount())
+                : balance.subtract(request.amount());
+
+        if (resultingBalance.compareTo(BigDecimal.ZERO) < 0) {
+            throw new InsufficientBalanceException(balance.max(BigDecimal.ZERO));
+        }
+    }
+
+    private BigDecimal currentBalance(UUID userId) {
+        BigDecimal incomes = transactionRepository.sumAmountByUserIdAndType(userId, TransactionType.INCOME);
+        BigDecimal expenses = transactionRepository.sumAmountByUserIdAndType(userId, TransactionType.EXPENSE);
+        return incomes.subtract(expenses);
     }
 }
