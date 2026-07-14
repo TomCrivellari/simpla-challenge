@@ -120,13 +120,13 @@ git clone <URL_DO_REPOSITORIO>
 cd simpla-challenge
 ```
 
-Opcionalmente, crie o arquivo de configuração para habilitar o assistente de IA:
+Opcionalmente, crie o arquivo de configuração do AI Service para habilitar o assistente de IA:
 
 ```bash
-cp .env.example .env
+cp ai-service/.env.example ai-service/.env
 ```
 
-Edite o `.env` e preencha `GEMINI_API_KEY`. Sem essa chave, toda a aplicação continua funcionando, exceto as respostas do assistente de IA.
+Edite o `ai-service/.env` e preencha `GEMINI_API_KEY`. Sem essa chave, toda a aplicação continua funcionando, exceto as respostas do assistente de IA.
 
 Inicie todo o ambiente:
 
@@ -274,7 +274,7 @@ Todos os valores possuem padrões adequados ao ambiente local, exceto a chave Ge
 
 > O valor de `JWT_SECRET` precisa ser idêntico no Auth, Gateway, Finance, Meta e AI. O padrão existente serve apenas para desenvolvimento; use um segredo longo e seguro em outros ambientes.
 
-Na execução com Docker Compose, copie o arquivo `.env.example` da raiz para `.env`. O Compose distribui automaticamente `JWT_SECRET`, `GEMINI_API_KEY` e `GEMINI_MODEL` aos containers e configura as URLs internas e os bancos. O arquivo `.env` não é versionado.
+Na execução com Docker Compose, a chave e o modelo Gemini são carregados de `ai-service/.env`. O `JWT_SECRET` pode ser configurado em um `.env` na raiz; se ele não existir, o Compose usa o valor local padrão. Esses arquivos `.env` não são versionados.
 
 Exemplo de execução com configurações personalizadas:
 
